@@ -2,23 +2,29 @@ import runpod
 import torch
 import base64
 import io
-import os
 from diffusers import FluxPipeline
 
-# Load model once when worker starts
+# ================================
+# LOAD MODEL (ONLY ONCE)
+# ================================
+
 pipe = FluxPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-dev",
-    torch_dtype=torch.float16,
-    token=os.environ.get("HF_TOKEN")
+    torch_dtype=torch.float16
 )
 
-pipe.to("cuda")
+pipe.enable_model_cpu_offload()
 
+# ================================
+# HANDLER
+# ================================
 
 def handler(job):
 
-    prompt = job["input"]["prompt"]
-    count = job["input"].get("count", 1)
+    job_input = job["input"]
+
+    prompt = job_input.get("prompt")
+    count = job_input.get("count", 1)
 
     images_base64 = []
 
@@ -37,9 +43,12 @@ def handler(job):
             base64.b64encode(buf.getvalue()).decode()
         )
 
-    return {"images": images_base64}
+    return {
+        "images": images_base64
+    }
 
+# ================================
+# START WORKER
+# ================================
 
-runpod.serverless.start({
-    "handler": handler
-})
+runpod.serverless.start({"handler": handler})
